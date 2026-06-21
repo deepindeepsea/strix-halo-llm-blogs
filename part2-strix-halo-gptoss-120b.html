@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Strix Halo APU — the memory frontier: a 120B on a single iGPU</title>
+<style>
+  :root {
+    --bg:#0b0c10; --panel:#13151c; --panel2:#171a22; --ink:#e8eaed; --mute:#8a8f98;
+    --accent:#ed1c24; --accent2:#ff8a3d; --good:#37d67a; --line:#23262d;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    line-height:1.55; -webkit-font-smoothing:antialiased; }
+  a { color:var(--accent2); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  .wrap { max-width:1000px; margin:0 auto; padding:64px 28px 96px; }
+
+  header { border-bottom:1px solid var(--line); padding-bottom:36px; margin-bottom:40px; }
+  .eyebrow { color:var(--accent); font-size:13px; letter-spacing:.18em; text-transform:uppercase;
+    font-weight:700; margin-bottom:14px; }
+  h1 { font-size:42px; line-height:1.14; margin:0 0 18px; font-weight:800; letter-spacing:-.01em; }
+  .sub { color:var(--mute); font-size:18px; max-width:820px; }
+  .byline { color:var(--mute); font-size:13px; margin-top:18px; }
+  .byline strong { color:var(--ink); }
+
+  h2 { font-size:13px; color:var(--accent2); letter-spacing:.16em; text-transform:uppercase;
+    font-weight:700; margin:52px 0 16px; padding-top:8px; }
+  h3 { font-size:21px; margin:30px 0 10px; font-weight:700; }
+  p { font-size:15.5px; color:#d4d7dc; }
+  .lead { font-size:16.5px; color:#dfe2e6; }
+
+  .grid { display:grid; gap:14px; }
+  .two { grid-template-columns:1fr 1fr; }
+  .three { grid-template-columns:1fr 1fr 1fr; }
+  @media (max-width:760px){ .two,.three { grid-template-columns:1fr; } }
+
+  .card { display:block; background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:20px 22px; }
+  .card .num { color:var(--accent); font-size:12px; font-weight:700; letter-spacing:.14em; }
+  .card .title { font-size:18px; font-weight:700; margin:4px 0 6px; }
+  .card .desc { color:var(--mute); font-size:14.5px; }
+  .card .meta { color:#cfd3d8; font-size:13px; margin-top:10px; border-top:1px solid var(--line); padding-top:10px; }
+  .card .meta b { color:var(--accent2); font-weight:700; }
+
+  .pill { display:inline-block; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+    font-weight:700; padding:3px 9px; border-radius:999px; border:1px solid var(--line); color:var(--mute); }
+  .pill.hero { color:var(--accent2); border-color:#5a3a1d; background:#1c140c; }
+  .pill.core { color:#9fc7ff; border-color:#23415f; background:#0e1722; }
+  .pill.win { color:#9af5c0; border-color:#1f5236; background:#0c1a12; }
+
+  table { width:100%; border-collapse:collapse; margin:14px 0 6px; font-size:13.5px; }
+  th,td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--accent2); font-size:12px; letter-spacing:.06em; text-transform:uppercase; }
+  td b { color:var(--ink); }
+  tr:hover td { background:#101218; }
+  .r { text-align:right; }
+  .win { color:var(--good); font-weight:700; }
+  .mono { font-family:Consolas,Monaco,monospace; font-size:12.5px; color:#cdd2d8; }
+
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:22px 24px; margin:14px 0; }
+  .panel.accent { border-left:3px solid var(--accent); }
+  .panel.warn { border-left:3px solid var(--accent2); }
+  .panel.good { border-left:3px solid var(--good); }
+  .kpi { display:flex; gap:26px; flex-wrap:wrap; margin:8px 0 0; }
+  .kpi div { min-width:130px; }
+  .kpi .big { font-size:30px; font-weight:800; color:var(--accent2); line-height:1.1; }
+  .kpi .lbl { font-size:12px; color:var(--mute); margin-top:4px; }
+
+  pre { background:#0a0b0f; border:1px solid var(--line); border-radius:8px; padding:14px 16px;
+    overflow-x:auto; font-family:Consolas,Monaco,monospace; font-size:12.5px; color:#cdd2d8; line-height:1.5; }
+  code { font-family:Consolas,Monaco,monospace; font-size:13px; color:#ffcf9e; }
+  ul { color:#d4d7dc; font-size:15px; } li { margin:5px 0; }
+  .step { color:var(--accent); font-weight:700; }
+  .bar { height:10px; border-radius:6px; background:#1d2129; overflow:hidden; margin-top:6px; }
+  .bar > span { display:block; height:100%; border-radius:6px; }
+  .bar .rocm { background:linear-gradient(90deg,#ed1c24,#ff5a3d); }
+  .bar .vk { background:linear-gradient(90deg,#3d7bff,#37d67a); }
+  footer { margin-top:56px; padding-top:24px; border-top:1px solid var(--line);
+    color:var(--mute); font-size:13px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+  .tag { color:var(--mute); font-size:12.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">A field series &middot; Results &middot; Part 2</div>
+  <h1>We loaded a 120-billion-parameter model onto a single integrated GPU. No discrete card. No reboot. It answered in real time.</h1>
+  <p class="sub">Part 2 of the Strix Halo field series &mdash; <i>the memory frontier</i>. In <a href="part1-strix-halo-rocm-vs-vulkan.html">Part 1</a> we proved a 70B dense model fits the iGPU and decodes at ~5 tok/s. Now we go bigger and smarter: <b>gpt-oss-120B</b>, a Mixture-of-Experts model in MXFP4, 59&nbsp;GiB of weights streamed straight into the 96&nbsp;GiB unified-memory pool. It decodes at <b>~56 tok/s for a single user</b> &mdash; an order of magnitude faster than the 70B dense &mdash; because only ~5B of those 120B parameters move per token. Here is every number, both backends, and how to reproduce it.</p>
+  <p class="byline"><strong>AMD Field AI Enthusiast</strong> &middot; by Pradeep Nallimelli &middot; June 2026 &middot; <span class="tag">status: RESULTS &mdash; measured on real hardware</span></p>
+</header>
+
+<!-- ============ TL;DR ============ -->
+<h2>The one-paragraph verdict</h2>
+<div class="panel good">
+  <p class="lead" style="margin-top:0">A <b>116.8-billion-parameter</b> model (gpt-oss-120B, MXFP4 MoE, ~5.1B active) loads <b>entirely onto the Radeon&nbsp;8060S iGPU</b> at <span class="mono">-ngl 99</span> &mdash; 59&nbsp;GiB of weights inside the 96&nbsp;GiB GTT pool, with <b>no BIOS edit and no reboot</b>. Single-user decode is <b>~56 tok/s</b> (Vulkan, the better single-user backend here), and Vulkan prefills <b>3.2&times; faster</b> than ROCm (569 vs 179 tok/s). But under concurrency the story flips earlier than it did for the 30B: <b>ROCm overtakes Vulkan on aggregate decode at just 4 streams</b>, and at 16 streams ROCm hits <b>227 tok/s &mdash; +78%</b> over Vulkan, which plateaus. The rule sharpens: <b>Vulkan for interactive, ROCm for batch</b> &mdash; and the crossover comes sooner the bigger the MoE. Same llama.cpp build (<span class="mono">063d9c1</span>), no per-backend cherry-picking.</p>
+  <div class="kpi">
+    <div><div class="big">120B</div><div class="lbl">params, fully on one iGPU<br>MXFP4 MoE, no reboot</div></div>
+    <div><div class="big">55.8</div><div class="lbl">tok/s &middot; single-user decode<br>Vulkan, FA on</div></div>
+    <div><div class="big">3.2&times;</div><div class="lbl">Vulkan prefill lead<br>over ROCm (569 vs 179)</div></div>
+    <div><div class="big">227</div><div class="lbl">tok/s &middot; ROCm aggregate<br>decode @ 16 streams (+78%)</div></div>
+  </div>
+</div>
+
+<!-- ============ WHY THIS IS HARD ============ -->
+<h2>Why a 120B on an APU is the interesting problem</h2>
+<p class="lead">A discrete 24&nbsp;GB or even 32&nbsp;GB GPU simply cannot hold this model. A 120B even in 4-bit is ~60&nbsp;GB of weights &mdash; it would have to be split across multiple cards or spilled to CPU, and either path collapses throughput. The Strix Halo bet is different: <b>one big pool of unified memory</b>, and an iGPU allowed to address almost all of it.</p>
+<table>
+  <tr><th>The constraint</th><th>The Strix Halo answer</th></tr>
+  <tr><td><b>Weights are 59&nbsp;GiB</b> &mdash; bigger than any consumer discrete VRAM.</td><td>128&nbsp;GB unified LPDDR5X; the iGPU draws from a <b>96&nbsp;GiB GTT pool</b>, so 59&nbsp;GiB fits with ~37&nbsp;GiB to spare for KV cache.</td></tr>
+  <tr><td><b>120B dense would decode at ~3 tok/s</b> on ~256&nbsp;GB/s &mdash; unusable.</td><td>gpt-oss-120B is <b>MoE</b>: only ~5.1B parameters activate per token, so the bytes-moved-per-token is small &rarr; <b>~56 tok/s</b>.</td></tr>
+  <tr><td><b>Big-model loading usually needs GTT/grub tuning or a reboot.</b></td><td>At 59&nbsp;GiB the model fits the <i>default</i> 96&nbsp;GiB pool &mdash; <b>no reboot, no grub edit, no BIOS carveout change.</b> It just loads.</td></tr>
+</table>
+<div class="panel accent">
+  <p style="margin:0"><b>The headline isn&rsquo;t the size &mdash; it&rsquo;s the combination.</b> 120B parameters of <i>knowledge capacity</i>, at the <i>decode speed</i> of a ~5B model, on a <i>single power-sipping APU</i>. MoE + MXFP4 + unified memory is the trifecta that makes it work.</p>
+</div>
+
+<!-- ============ THE BENCH ============ -->
+<h2>The bench &middot; one APU, two backends, same commit</h2>
+<p class="lead">Identical method to Part 1: nothing differs except the GPU backend. Both binaries compiled from the <i>same</i> llama.cpp checkout (<span class="mono">063d9c1</span>) on the <i>same</i> machine; only the backend flag changed.</p>
+<table>
+  <tr><th>Layer</th><th>What we ran</th><th>Notes</th></tr>
+  <tr><td><b>APU</b></td><td>AMD Ryzen AI Max+ 395 &ldquo;Strix Halo&rdquo;</td><td>16 Zen 5 cores + Radeon 8060S iGPU (40 CU, RDNA 3.5, <span class="mono">gfx1151</span>).</td></tr>
+  <tr><td><b>Memory</b></td><td>128&nbsp;GB unified LPDDR5X, ~256&nbsp;GB/s</td><td>GPU fed from system RAM via a 96&nbsp;GiB GTT pool.</td></tr>
+  <tr><td><b>OS / kernel</b></td><td>Ubuntu 24.04.4 LTS, kernel 6.17-oem</td><td>Full unified memory GPU-addressable; no 15.5&nbsp;GB cap.</td></tr>
+  <tr><td><b>Backend A</b></td><td>ROCm / HIP 7.2.0</td><td><span class="mono">build/</span> &mdash; <span class="mono">-DGGML_HIP=ON -DAMDGPU_TARGETS=gfx1151</span>.</td></tr>
+  <tr><td><b>Backend B</b></td><td>Vulkan / RADV (Mesa)</td><td><span class="mono">build-vulkan/</span> &mdash; <span class="mono">-DGGML_VULKAN=ON</span>.</td></tr>
+  <tr><td><b>Model</b></td><td>gpt-oss-120b-mxfp4 (3-part GGUF)</td><td>116.83&nbsp;B params, MXFP4, <b>59.02&nbsp;GiB</b>; from <span class="mono">ggml-org/gpt-oss-120b-GGUF</span>.</td></tr>
+  <tr><td><b>Harness</b></td><td>llama.cpp <span class="mono">build 063d9c1</span></td><td><span class="mono">llama-bench</span> (per-config t/s) + <span class="mono">llama-batched-bench</span> (concurrency).</td></tr>
+</table>
+
+<div class="panel">
+  <p style="margin-top:0"><b>Get the model and load it (the exact commands):</b></p>
+<pre># gpt-oss-120B MXFP4 GGUF — three shards, ~63 GB total download
+BASE=https://huggingface.co/ggml-org/gpt-oss-120b-GGUF/resolve/main
+for i in 00001 00002 00003; do
+  wget -c "$BASE/gpt-oss-120b-mxfp4-${i}-of-00003.gguf"
+done
+
+# Multi-part GGUF auto-loads from shard 00001 — point llama.cpp at part 1 only.
+# All layers on the iGPU; no reboot, no grub change needed at 59 GiB.
+build-vulkan/bin/llama-server \
+  -m gpt-oss-120b-mxfp4-00001-of-00003.gguf -ngl 99 -fa on -c 8192</pre>
+  <p style="margin-bottom:0" class="tag">Confirm your llama.cpp supports it: the source must contain <span class="mono">LLM_ARCH_OPENAI_MOE "gpt-oss"</span> and <span class="mono">GGML_TYPE_MXFP4</span>. Commit <span class="mono">063d9c1</span> does. <span class="mono">-ngl 99</span> places all layers on the GPU; the 59&nbsp;GiB load takes ~30&ndash;60&nbsp;s the first time.</p>
+</div>
+
+<!-- ============ RESULT 1 ============ -->
+<h2>Result 1 &middot; single-user throughput &mdash; the 120B is genuinely interactive</h2>
+<p class="lead">Each cell is the best of the flash-attention sweep, <span class="mono">-ngl 99</span> (all layers on GPU), 3 repeats. Prefill = <span class="mono">pp512</span>; decode = <span class="mono">tg128</span>. Higher is better.</p>
+<table>
+  <tr><th>Backend</th><th class="r">FA off &middot; prefill</th><th class="r">FA on &middot; prefill</th><th class="r">FA off &middot; decode</th><th class="r">FA on &middot; decode</th><th>Best decode</th></tr>
+  <tr><td><b>ROCm</b></td><td class="r">177.0</td><td class="r">179.1</td><td class="r">49.2</td><td class="r">50.9</td><td>50.9 tok/s</td></tr>
+  <tr><td><b>Vulkan</b></td><td class="r">524.6</td><td class="r win">568.9</td><td class="r">54.5</td><td class="r win">55.8</td><td><span class="pill win">Vulkan 55.8</span></td></tr>
+</table>
+<p>Vulkan wins both metrics. The decode gap is modest (+9.5%, 55.8 vs 50.9) because decode is bandwidth-bound &mdash; both backends are streaming the same ~5B active parameters per token against the same memory wall. The <b>prefill gap is enormous: 3.2&times;</b> (569 vs 179). RADV&rsquo;s MoE expert-gather and matmul path on gfx1151 is dramatically more efficient at the compute-bound prefill stage.</p>
+
+<div class="panel">
+  <p style="margin-top:0"><b>Single-user decode, gpt-oss-120B (drawn to scale):</b></p>
+  <p style="margin:14px 0 2px"><span class="mono">ROCm&nbsp;&nbsp;&nbsp;50.9</span></p>
+  <div class="bar"><span class="rocm" style="width:91%"></span></div>
+  <p style="margin:14px 0 2px"><span class="mono">Vulkan&nbsp;55.8</span></p>
+  <div class="bar"><span class="vk" style="width:100%"></span></div>
+  <p style="margin:18px 0 2px"><b>Single-user prefill (pp512) &mdash; the real story:</b></p>
+  <p style="margin:14px 0 2px"><span class="mono">ROCm&nbsp;&nbsp;179</span></p>
+  <div class="bar"><span class="rocm" style="width:31%"></span></div>
+  <p style="margin:14px 0 2px"><span class="mono">Vulkan&nbsp;569</span></p>
+  <div class="bar"><span class="vk" style="width:100%"></span></div>
+</div>
+
+<!-- ============ RESULT 2 ============ -->
+<h2>Result 2 &middot; flash attention &mdash; this time, on wins everywhere</h2>
+<p class="lead">A notable departure from Part 1. There, ROCm prefill was <i>faster with FA off</i> on the Qwen3-30B. For gpt-oss-120B MXFP4, <b>FA on is the best setting on both backends, for both prefill and decode.</b></p>
+<table>
+  <tr><th>Backend</th><th class="r">FA off prefill</th><th class="r">FA on prefill</th><th class="r">FA off decode</th><th class="r">FA on decode</th><th>Best setting</th></tr>
+  <tr><td><b>ROCm</b></td><td class="r">177.0</td><td class="r win">179.1</td><td class="r">49.2</td><td class="r win">50.9</td><td>FA <b>on</b></td></tr>
+  <tr><td><b>Vulkan</b></td><td class="r">524.6</td><td class="r win">568.9</td><td class="r">54.5</td><td class="r win">55.8</td><td>FA <b>on</b></td></tr>
+</table>
+<p>The lesson: <b>flash-attention tuning is model-architecture-specific, not just backend-specific.</b> The &ldquo;ROCm prefills faster with FA off&rdquo; rule from Part 1 was true for that model &mdash; it does <i>not</i> carry over to this MXFP4 MoE. Always re-sweep <span class="mono">-fa 0,1</span> when you change model family. Here the answer is simple: leave FA on.</p>
+
+<!-- ============ RESULT 3 ============ -->
+<h2>Result 3 &middot; the crossover &mdash; concurrency flips the winner at <i>4</i> streams</h2>
+<p class="lead">Driving the 120B with <span class="mono">llama-batched-bench</span> at 1&ndash;16 parallel sequences (128-token prompt + 128-token gen each, FA on) is where the operational decision lives. Two views matter: <b>aggregate decode</b> (token-generation throughput) and <b>total</b> throughput (prefill + decode combined).</p>
+
+<h3>Aggregate decode throughput (S_TG tok/s) &mdash; the serving metric</h3>
+<table>
+  <tr><th>Concurrent streams</th><th class="r">ROCm decode</th><th class="r">Vulkan decode</th><th>Leader</th></tr>
+  <tr><td><b>1</b></td><td class="r">51.1</td><td class="r win">55.5</td><td><span class="pill win">Vulkan</span></td></tr>
+  <tr><td><b>2</b></td><td class="r">77.7</td><td class="r win">81.4</td><td><span class="pill win">Vulkan</span></td></tr>
+  <tr><td><b>4</b></td><td class="r win">119.6</td><td class="r">112.4</td><td><span class="pill hero">ROCm</span></td></tr>
+  <tr><td><b>8</b></td><td class="r win">164.4</td><td class="r">131.5</td><td><span class="pill hero">ROCm</span></td></tr>
+  <tr><td><b>16</b></td><td class="r win">226.7</td><td class="r">127.1</td><td><span class="pill hero">ROCm +78%</span></td></tr>
+</table>
+<p>Vulkan leads at 1&ndash;2 streams, but <b>ROCm overtakes at 4</b> and never looks back. By 16 streams ROCm reaches <b>226.7 tok/s while Vulkan has plateaued and regressed to 127.1</b> &mdash; a 78% ROCm advantage. Note this crossover is <b>earlier than the Qwen3-30B</b> in Part 1 (which crossed at 16): the bigger the MoE, the sooner ROCm&rsquo;s batched scheduler pulls ahead under load.</p>
+
+<h3>Total throughput (S tok/s, prefill + decode) &mdash; Vulkan&rsquo;s prefill keeps it ahead</h3>
+<table>
+  <tr><th>Concurrent streams</th><th class="r">ROCm total</th><th class="r">Vulkan total</th><th>Leader</th></tr>
+  <tr><td><b>1</b></td><td class="r">61.4</td><td class="r win">91.9</td><td><span class="pill win">Vulkan</span></td></tr>
+  <tr><td><b>2</b></td><td class="r">92.2</td><td class="r win">135.5</td><td><span class="pill win">Vulkan</span></td></tr>
+  <tr><td><b>4</b></td><td class="r">143.3</td><td class="r win">187.7</td><td><span class="pill win">Vulkan</span></td></tr>
+  <tr><td><b>8</b></td><td class="r">170.5</td><td class="r win">211.7</td><td><span class="pill win">Vulkan</span></td></tr>
+  <tr><td><b>16</b></td><td class="r">199.3</td><td class="r win">206.2</td><td><span class="pill win">Vulkan</span></td></tr>
+</table>
+<p>This is the nuance worth internalizing: <b>which backend &ldquo;wins&rdquo; under concurrency depends on what you measure.</b> If your workload is decode-dominated (long generations, short prompts &mdash; chat, agents), ROCm is the batch winner from 4 streams up. If it&rsquo;s prefill-heavy (long prompts, short answers &mdash; RAG, classification, summarization), Vulkan&rsquo;s 3&times; prefill keeps its total throughput ahead even at 16 streams. Pick by workload shape, not by a single headline number.</p>
+
+<div class="panel accent">
+  <p style="margin:0"><b>The decision, stated plainly:</b> single user &rarr; <b>Vulkan</b>. Decode-bound batch serving (&ge;4 streams) &rarr; <b>ROCm</b>. Prefill-bound batch &rarr; <b>Vulkan</b>. The 120B doesn&rsquo;t change the Part 1 rule &mdash; it sharpens it and moves the decode crossover down to 4 streams.</p>
+</div>
+
+<!-- ============ RESULT 4: capacity ============ -->
+<h2>Result 4 &middot; the capacity picture &mdash; what fits, and what&rsquo;s left over</h2>
+<p class="lead">The 59&nbsp;GiB of weights is only part of the budget. The 96&nbsp;GiB GTT pool also has to hold the KV cache, and that leftover is what determines how much context you can serve.</p>
+<div class="grid three">
+  <div class="card">
+    <div class="num">WEIGHTS</div>
+    <div class="title">59.0 GiB</div>
+    <div class="desc">gpt-oss-120B MXFP4, all layers resident on the iGPU at <span class="mono">-ngl 99</span>.</div>
+  </div>
+  <div class="card">
+    <div class="num">HEADROOM</div>
+    <div class="title">~37 GiB</div>
+    <div class="desc">Remaining GTT for KV cache &amp; activations &mdash; ample for multi-stream contexts at this model&rsquo;s small per-token KV footprint (MoE).</div>
+  </div>
+  <div class="card">
+    <div class="num">RESULT</div>
+    <div class="title">No reboot</div>
+    <div class="desc">59 &lt; 96, so the default pool holds it. The reboot/grub-tuning gate only appears for the even larger 235B-class models.</div>
+  </div>
+</div>
+<p>Compared to Part 1&rsquo;s 70B-dense (39.6&nbsp;GiB, ~5&nbsp;tok/s), this 120B-MoE is <b>50% more weight on disk but ~11&times; faster to decode</b>. That is the entire argument for MoE on bandwidth-limited silicon, stated as one comparison: <b>capacity is set by total parameters; speed is set by active parameters.</b> Strix Halo&rsquo;s unified memory lets you buy the first without paying for it in the second.</p>
+
+<!-- ============ REPRODUCE ============ -->
+<h2>Reproduce every number</h2>
+<p class="lead">The exact sweep, runnable on any Strix Halo box once both backends are built (see Part 1 for the build commands):</p>
+<div class="panel">
+<pre>MODEL=gpt-oss-120b/gpt-oss-120b-mxfp4-00001-of-00003.gguf   # shard 1 auto-loads the set
+ROCM=llama.cpp/build/bin
+VK=llama.cpp/build-vulkan/bin
+
+# Result 1 + 2 — single-user FA sweep (prefill + decode), both backends
+$ROCM/llama-bench -m $MODEL -ngl 99 -fa 0,1 -p 512 -n 128 -r 3
+$VK/llama-bench   -m $MODEL -ngl 99 -fa 0,1 -p 512 -n 128 -r 3
+
+# Result 3 — concurrency sweep (note: newer llama.cpp needs '-fa on', not bare '-fa')
+$ROCM/llama-batched-bench -m $MODEL -ngl 99 -fa on -c 4608 -npp 128 -ntg 128 -npl 1,2,4,8,16
+$VK/llama-batched-bench   -m $MODEL -ngl 99 -fa on -c 4608 -npp 128 -ntg 128 -npl 1,2,4,8,16</pre>
+  <p style="margin-bottom:0" class="tag">Environment: Ryzen AI Max+ 395 / Radeon 8060S (gfx1151), 128&nbsp;GB unified, 96&nbsp;GiB GTT; Ubuntu 24.04.4, kernel 6.17-oem; ROCm 7.2.0; llama.cpp <span class="mono">063d9c1</span>. Model 59.02&nbsp;GiB, 116.83&nbsp;B params, MXFP4 MoE. Raw <span class="mono">llama-bench</span> / <span class="mono">llama-batched-bench</span> tables and CSV/JSON are archived alongside this post.</p>
+</div>
+
+<!-- ============ WHATS NEXT ============ -->
+<h2>What&rsquo;s next in the series</h2>
+<div class="grid two">
+  <div class="card">
+    <div class="num">PART 2.5 &middot; <span class="pill core">Core</span></div>
+    <div class="title">Past the default pool &mdash; 235B and the reboot gate.</div>
+    <div class="desc">Push GTT beyond 96&nbsp;GiB to seat a 235B-class MoE, measure the long-context KV ceiling, and document the grub/reboot tuning (and the IP-persistence safeguard) it requires.</div>
+  </div>
+  <div class="card">
+    <div class="num">PART 3 &middot; <span class="pill hero">APU-native</span></div>
+    <div class="title">The NPU angle &mdash; Lemonade hybrid iGPU+NPU.</div>
+    <div class="desc">Where XDNA2 + Ryzen-AI changes the math, and whether hybrid execution beats pure-Vulkan on the workloads that matter.</div>
+  </div>
+</div>
+
+<footer>
+  <div>Strix Halo APU field series &middot; Part 2 of N &middot; companion to the R9700 + vLLM series.</div>
+  <div>All numbers measured on real hardware, June 2026. No vendor tuning beyond the documented flags.</div>
+</footer>
+
+</div>
+</body>
+</html>

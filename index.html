@@ -54,12 +54,18 @@
     <div class="desc">Same iGPU, same model, two backends. Vulkan takes single-user decode on the 30B&nbsp;MoE; ROCm pulls ahead under heavy concurrent batching &mdash; and a 70B&nbsp;Q4 runs entirely on the integrated GPU via the unified-memory pool.</div>
   </a>
 </div>
+  <a class="card" href="part2-strix-halo-gptoss-120b.html">
+    <div class="num">PART 2</div>
+    <div class="title">The memory frontier &mdash; a 120B on a single iGPU, no reboot.</div>
+    <div class="desc">gpt-oss-120B (MXFP4 MoE, 59&nbsp;GiB) loads entirely onto the Radeon&nbsp;8060S via the 96&nbsp;GiB unified pool and decodes at ~56&nbsp;tok/s single-user. Vulkan prefills 3.2&times; faster; ROCm wins decode-bound batch from 4 streams up (227&nbsp;tok/s @16, +78%).</div>
+  </a>
+</div>
 <div class="group-label">Coming next</div>
 <div class="grid">
   <div class="card" style="opacity:.55; cursor:default;">
-    <div class="num">PART 2 &middot; PLANNED</div>
-    <div class="title">The memory frontier &mdash; 120B and 235B on one APU.</div>
-    <div class="desc">Pushing past 70B into gpt-oss-120B and Qwen3-235B-A22B by tuning the GTT pool, where unified memory becomes the whole story.</div>
+    <div class="num">PART 2.5 &middot; PLANNED</div>
+    <div class="title">Past the default pool &mdash; 235B and the reboot gate.</div>
+    <div class="desc">Pushing GTT beyond 96&nbsp;GiB to seat a Qwen3-235B-A22B-class MoE, mapping the long-context KV ceiling and the grub/reboot tuning it requires.</div>
   </div>
   <div class="card" style="opacity:.55; cursor:default;">
     <div class="num">PART 3 &middot; PLANNED</div>
