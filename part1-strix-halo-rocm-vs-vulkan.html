@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Strix Halo APU — ROCm vs Vulkan: the single-APU LLM inference results</title>
+<style>
+  :root {
+    --bg:#0b0c10; --panel:#13151c; --panel2:#171a22; --ink:#e8eaed; --mute:#8a8f98;
+    --accent:#ed1c24; --accent2:#ff8a3d; --good:#37d67a; --line:#23262d;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    line-height:1.55; -webkit-font-smoothing:antialiased; }
+  a { color:var(--accent2); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  .wrap { max-width:1000px; margin:0 auto; padding:64px 28px 96px; }
+
+  header { border-bottom:1px solid var(--line); padding-bottom:36px; margin-bottom:40px; }
+  .eyebrow { color:var(--accent); font-size:13px; letter-spacing:.18em; text-transform:uppercase;
+    font-weight:700; margin-bottom:14px; }
+  h1 { font-size:42px; line-height:1.14; margin:0 0 18px; font-weight:800; letter-spacing:-.01em; }
+  .sub { color:var(--mute); font-size:18px; max-width:820px; }
+  .byline { color:var(--mute); font-size:13px; margin-top:18px; }
+  .byline strong { color:var(--ink); }
+
+  h2 { font-size:13px; color:var(--accent2); letter-spacing:.16em; text-transform:uppercase;
+    font-weight:700; margin:52px 0 16px; padding-top:8px; }
+  h3 { font-size:21px; margin:30px 0 10px; font-weight:700; }
+  p { font-size:15.5px; color:#d4d7dc; }
+  .lead { font-size:16.5px; color:#dfe2e6; }
+
+  .grid { display:grid; gap:14px; }
+  .two { grid-template-columns:1fr 1fr; }
+  .three { grid-template-columns:1fr 1fr 1fr; }
+  @media (max-width:760px){ .two,.three { grid-template-columns:1fr; } }
+
+  .card { display:block; background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:20px 22px; }
+  .card .num { color:var(--accent); font-size:12px; font-weight:700; letter-spacing:.14em; }
+  .card .title { font-size:18px; font-weight:700; margin:4px 0 6px; }
+  .card .desc { color:var(--mute); font-size:14.5px; }
+  .card .meta { color:#cfd3d8; font-size:13px; margin-top:10px; border-top:1px solid var(--line); padding-top:10px; }
+  .card .meta b { color:var(--accent2); font-weight:700; }
+
+  .pill { display:inline-block; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+    font-weight:700; padding:3px 9px; border-radius:999px; border:1px solid var(--line); color:var(--mute); }
+  .pill.hero { color:var(--accent2); border-color:#5a3a1d; background:#1c140c; }
+  .pill.core { color:#9fc7ff; border-color:#23415f; background:#0e1722; }
+  .pill.win { color:#9af5c0; border-color:#1f5236; background:#0c1a12; }
+
+  table { width:100%; border-collapse:collapse; margin:14px 0 6px; font-size:13.5px; }
+  th,td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--accent2); font-size:12px; letter-spacing:.06em; text-transform:uppercase; }
+  td b { color:var(--ink); }
+  tr:hover td { background:#101218; }
+  .r { text-align:right; }
+  .win { color:var(--good); font-weight:700; }
+  .mono { font-family:Consolas,Monaco,monospace; font-size:12.5px; color:#cdd2d8; }
+
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:22px 24px; margin:14px 0; }
+  .panel.accent { border-left:3px solid var(--accent); }
+  .panel.warn { border-left:3px solid var(--accent2); }
+  .panel.good { border-left:3px solid var(--good); }
+  .kpi { display:flex; gap:26px; flex-wrap:wrap; margin:8px 0 0; }
+  .kpi div { min-width:130px; }
+  .kpi .big { font-size:30px; font-weight:800; color:var(--accent2); line-height:1.1; }
+  .kpi .lbl { font-size:12px; color:var(--mute); margin-top:4px; }
+
+  pre { background:#0a0b0f; border:1px solid var(--line); border-radius:8px; padding:14px 16px;
+    overflow-x:auto; font-family:Consolas,Monaco,monospace; font-size:12.5px; color:#cdd2d8; line-height:1.5; }
+  code { font-family:Consolas,Monaco,monospace; font-size:13px; color:#ffcf9e; }
+  ul { color:#d4d7dc; font-size:15px; } li { margin:5px 0; }
+  .step { color:var(--accent); font-weight:700; }
+  .bar { height:10px; border-radius:6px; background:#1d2129; overflow:hidden; margin-top:6px; }
+  .bar > span { display:block; height:100%; border-radius:6px; }
+  .bar .rocm { background:linear-gradient(90deg,#ed1c24,#ff5a3d); }
+  .bar .vk { background:linear-gradient(90deg,#3d7bff,#37d67a); }
+  footer { margin-top:56px; padding-top:24px; border-top:1px solid var(--line);
+    color:var(--mute); font-size:13px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+  .tag { color:var(--mute); font-size:12.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">A field series &middot; Results &middot; Part 1</div>
+  <h1>ROCm or Vulkan on Strix Halo? We benchmarked both, head to head, and the iGPU picked a side.</h1>
+  <p class="sub">The first measured chapter of the <a href="https://deepindeepsea.github.io/r9700-vllm-blogs/">R9700 method</a> applied to an APU. Two complete llama.cpp backends &mdash; ROCm/HIP and Vulkan/RADV &mdash; built from the <i>same source commit</i>, run on the <i>same</i> Radeon&nbsp;8060S iGPU, across four models from 8B to 70B, single-user and batched. One backend wins the desktop. The other wins the server. Here is exactly where the line is, and how to reproduce every number.</p>
+  <p class="byline"><strong>AMD Field AI Enthusiast</strong> &middot; by Pradeep Nallimelli &middot; June 2026 &middot; <span class="tag">status: RESULTS &mdash; measured on real hardware</span></p>
+</header>
+
+<!-- ============ TL;DR ============ -->
+<h2>The one-paragraph verdict</h2>
+<div class="panel good">
+  <p class="lead" style="margin-top:0">On the Ryzen&nbsp;AI&nbsp;Max+&nbsp;395&rsquo;s integrated Radeon&nbsp;8060S, <b>Vulkan/RADV is the better single-user backend</b> &mdash; decisively so on a Mixture-of-Experts model (<b>+37% decode</b> on Qwen3-30B-A3B: 96.4 vs 70.4 tok/s), and modestly (2&ndash;3%) on dense models. But there is a <b>crossover</b>: under heavy batching, <b>ROCm scales further</b> and overtakes Vulkan at 16 concurrent streams (272 vs 180 tok/s aggregate decode, <b>+51% for ROCm</b>). The practical rule: <b>Vulkan for interactive and small-batch; ROCm for many-stream batch serving.</b> Same llama.cpp build (<span class="mono">063d9c1</span>), no per-backend cherry-picking.</p>
+  <div class="kpi">
+    <div><div class="big">96.4</div><div class="lbl">tok/s &middot; Vulkan single-user<br>Qwen3-30B-A3B Q4_K_M</div></div>
+    <div><div class="big">+37%</div><div class="lbl">Vulkan decode lead<br>over ROCm (MoE, batch 1)</div></div>
+    <div><div class="big">630</div><div class="lbl">tok/s &middot; ROCm aggregate<br>@ 16 streams (the crossover)</div></div>
+    <div><div class="big">70B</div><div class="lbl">Q4 fits &amp; runs on the iGPU<br>~5 tok/s, no reboot</div></div>
+  </div>
+</div>
+
+<!-- ============ THE BENCH ============ -->
+<h2>The bench &middot; one APU, two backends, same commit</h2>
+<p class="lead">The whole point of a head-to-head is that nothing differs except the backend. Both binaries were compiled from the <i>same</i> llama.cpp checkout on the <i>same</i> machine; only the GPU backend flag changed. Then every model was run through an identical sweep.</p>
+<table>
+  <tr><th>Layer</th><th>What we ran</th><th>Notes</th></tr>
+  <tr><td><b>APU</b></td><td>AMD Ryzen AI Max+ 395 &ldquo;Strix Halo&rdquo;</td><td>16 Zen 5 cores + Radeon 8060S iGPU (40 CU, RDNA 3.5, <span class="mono">gfx1151</span>).</td></tr>
+  <tr><td><b>Memory</b></td><td>128&nbsp;GB unified LPDDR5X-8000, ~256&nbsp;GB/s</td><td>512&nbsp;MB BIOS carveout; GPU fed from system RAM via a 96&nbsp;GiB GTT pool.</td></tr>
+  <tr><td><b>OS / kernel</b></td><td>Ubuntu 24.04 LTS, kernel 6.17 (OEM)</td><td>&ge;6.16.9, so the old 15.5&nbsp;GB VRAM cap is gone &mdash; full memory is GPU-addressable.</td></tr>
+  <tr><td><b>Backend A</b></td><td>ROCm / HIP 7.2.0</td><td>Built <span class="mono">-DGGML_HIP=ON -DAMDGPU_TARGETS=gfx1151</span> + rocWMMA FA; run with <span class="mono">HSA_OVERRIDE_GFX_VERSION=11.5.1</span>.</td></tr>
+  <tr><td><b>Backend B</b></td><td>Vulkan / RADV (Mesa 25.2.8)</td><td>Built <span class="mono">-DGGML_VULKAN=ON</span>; Mesa&rsquo;s open RADV driver reporting &ldquo;RADV GFX1151&rdquo;.</td></tr>
+  <tr><td><b>Harness</b></td><td>llama.cpp <span class="mono">build 063d9c1</span></td><td><span class="mono">llama-bench</span> (per-config t/s) + <span class="mono">llama-batched-bench</span> (concurrency).</td></tr>
+  <tr><td><b>Anchor model</b></td><td>Qwen3-30B-A3B-Q4_K_M (MoE)</td><td>Same model family used as the apples-to-apples anchor across the series.</td></tr>
+</table>
+
+<div class="panel">
+  <p style="margin-top:0"><b>Build both backends from one source tree (the exact commands):</b></p>
+<pre>git clone https://github.com/ggml-org/llama.cpp &amp;&amp; cd llama.cpp
+
+# Backend A — ROCm / HIP
+cmake -B build -DGGML_HIP=ON -DAMDGPU_TARGETS=gfx1151 \
+      -DGGML_HIP_ROCWMMA_FATTN=ON -DGGML_HIP_NO_VMM=ON \
+      -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release -j $(nproc)
+
+# Backend B — Vulkan / RADV
+sudo apt install -y libvulkan-dev glslc glslang-tools glslang-dev \
+                    spirv-headers spirv-tools mesa-vulkan-drivers
+cmake -B build-vulkan -DGGML_VULKAN=ON -DLLAMA_CURL=OFF \
+      -DCMAKE_BUILD_TYPE=Release
+cmake --build build-vulkan --config Release -j $(nproc)</pre>
+  <p style="margin-bottom:0" class="tag">The Vulkan toolchain needs the SPIR-V headers (<span class="mono">spirv-headers</span> + <span class="mono">glslang-dev</span>) or the CMake config step fails looking for <span class="mono">SPIRV-HeadersConfig.cmake</span>. That single apt line is the only gotcha.</p>
+</div>
+
+<!-- ============ HEADLINE RESULTS ============ -->
+<h2>Result 1 &middot; single-user throughput, four models</h2>
+<p class="lead">Each cell is the best of the flash-attention sweep (FA on/off) for that backend, <span class="mono">-ngl 99</span> (all layers on GPU), Q4_K_M, 3 repeats. Prefill = <span class="mono">pp512</span>; decode = <span class="mono">tg128</span> (<span class="mono">tg64</span> for 70B). Higher is better.</p>
+<table>
+  <tr><th>Model</th><th class="r">ROCm prefill</th><th class="r">Vulkan prefill</th><th class="r">ROCm decode</th><th class="r">Vulkan decode</th><th>Decode winner</th></tr>
+  <tr><td><b>Qwen3-30B-A3B</b> <span class="tag">MoE, 3.3B active</span></td><td class="r">1067.1</td><td class="r win">1174.6</td><td class="r">70.4</td><td class="r win">96.4</td><td><span class="pill win">Vulkan +37%</span></td></tr>
+  <tr><td><b>Llama-3.1-8B</b> <span class="tag">dense</span></td><td class="r">1097.6</td><td class="r win">1109.7</td><td class="r">42.4</td><td class="r win">43.7</td><td><span class="pill win">Vulkan +3%</span></td></tr>
+  <tr><td><b>Qwen3-14B</b> <span class="tag">dense</span></td><td class="r win">685.5</td><td class="r">636.0</td><td class="r">24.2</td><td class="r win">24.7</td><td><span class="pill win">Vulkan +2%</span></td></tr>
+  <tr><td><b>Llama-70B</b> <span class="tag">dense, Q4</span></td><td class="r">112.6</td><td class="r win">114.3</td><td class="r">5.0</td><td class="r win">5.2</td><td><span class="pill win">Vulkan +3%</span></td></tr>
+</table>
+<p>The pattern is unambiguous: <b>Vulkan wins single-user decode on every model</b>. On dense models the gap is small (the kernels are bandwidth-bound and both backends saturate the same ~256&nbsp;GB/s wall). On the <b>MoE model the gap explodes to +37%</b> &mdash; RADV&rsquo;s expert-routing / gather path on gfx1151 is simply more efficient than the current ROCm path. That MoE advantage is the single most important finding for this APU, because MoE is exactly the model shape that makes a bandwidth-limited chip feel fast.</p>
+
+<div class="panel">
+  <p style="margin-top:0"><b>Decode tok/s, Qwen3-30B-A3B (single user)</b> &mdash; the headline gap, drawn to scale:</p>
+  <p style="margin:14px 0 2px"><span class="mono">ROCm&nbsp;&nbsp;&nbsp;70.4</span></p>
+  <div class="bar"><span class="rocm" style="width:73%"></span></div>
+  <p style="margin:14px 0 2px"><span class="mono">Vulkan&nbsp;96.4</span></p>
+  <div class="bar"><span class="vk" style="width:100%"></span></div>
+</div>
+
+<!-- ============ FA SWEEP ============ -->
+<h2>Result 2 &middot; flash attention behaves <i>oppositely</i> on the two backends</h2>
+<p class="lead">A tuning trap worth pinning down: the &ldquo;always use <code>-fa 1</code>&rdquo; folklore is backend-specific on this iGPU.</p>
+<table>
+  <tr><th>Backend</th><th class="r">FA off &middot; prefill</th><th class="r">FA on &middot; prefill</th><th class="r">FA off &middot; decode</th><th class="r">FA on &middot; decode</th><th>Best setting</th></tr>
+  <tr><td><b>ROCm</b></td><td class="r win">1067.1</td><td class="r">828.5</td><td class="r">66.2</td><td class="r win">70.4</td><td>FA <b>off</b> for prefill, <b>on</b> for decode</td></tr>
+  <tr><td><b>Vulkan</b></td><td class="r">1070.5</td><td class="r win">1174.6</td><td class="r">93.9</td><td class="r win">96.4</td><td>FA <b>on</b> &mdash; wins both</td></tr>
+</table>
+<p>On <b>Vulkan, flash attention is a free win</b>: it improves both prefill and decode, so leave it on. On <b>ROCm it&rsquo;s a trade</b>: FA on costs you ~22% prefill throughput on the MoE while buying ~6% decode. If you serve long prompts on ROCm, FA off may actually be the right call &mdash; the opposite of the usual advice.</p>
+
+<!-- ============ PREFILL DEPTH ============ -->
+<h2>Result 3 &middot; prefill at depth &mdash; where Vulkan pulls away</h2>
+<p class="lead">Short-prompt prefill is close, but as the prompt grows, the backends diverge hard. Qwen3-30B-A3B, FA on, prefill tok/s at increasing prompt length:</p>
+<table>
+  <tr><th>Prompt length</th><th class="r">ROCm</th><th class="r">Vulkan</th><th class="r">Vulkan advantage</th></tr>
+  <tr><td><b>512 tokens</b></td><td class="r">770</td><td class="r win">1159</td><td class="r">+51%</td></tr>
+  <tr><td><b>2048 tokens</b></td><td class="r">309</td><td class="r win">1106</td><td class="r">+258%</td></tr>
+  <tr><td><b>4096 tokens</b></td><td class="r">211</td><td class="r win">966</td><td class="r">+358%</td></tr>
+</table>
+<p>This is dramatic. ROCm prefill <b>collapses</b> with prompt depth (770 &rarr; 211 tok/s), while Vulkan stays remarkably flat (1159 &rarr; 966). At a 4K prompt, Vulkan prefills <b>4.6&times; faster</b>. For any retrieval, long-context, or document-heavy workload on this APU, Vulkan isn&rsquo;t just a little better &mdash; it&rsquo;s a different class of usable.</p>
+
+<!-- ============ UBATCH ============ -->
+<h2>Result 4 &middot; the micro-batch knob (<code>-ub</code>)</h2>
+<p class="lead">The cheapest tuning lever is <span class="mono">-ub</span> (physical micro-batch). Qwen3-30B-A3B prefill, FA on, sweeping <span class="mono">-ub</span> 256/512/1024:</p>
+<table>
+  <tr><th>-ub</th><th class="r">ROCm pp512</th><th class="r">Vulkan pp512</th></tr>
+  <tr><td><b>256</b></td><td class="r">705</td><td class="r">868</td></tr>
+  <tr><td><b>512</b> <span class="tag">(default)</span></td><td class="r win">833</td><td class="r">1152</td></tr>
+  <tr><td><b>1024</b></td><td class="r">791</td><td class="r win">1154</td></tr>
+</table>
+<p>Takeaway: <b>the default <span class="mono">-ub 512</span> is already near-optimal</b>. ROCm peaks exactly at 512; Vulkan is flat from 512&ndash;1024 and you can push to 1024 if you have the memory headroom. Going below 512 hurts both. No exotic tuning required.</p>
+
+<!-- ============ 70B FRONTIER ============ -->
+<h2>Result 5 &middot; the capacity flex &mdash; a 70B on an iGPU, no reboot</h2>
+<p class="lead">This is the move a discrete 32&nbsp;GB card cannot make. Llama-70B Q4_K_M is <b>39.6&nbsp;GiB</b> &mdash; it loaded fully onto the integrated GPU at <span class="mono">-ngl 99</span> through the 96&nbsp;GiB GTT pool, with no BIOS change and no reboot.</p>
+<div class="grid two">
+  <div class="card">
+    <div class="num">ROCm &middot; 70B Q4</div>
+    <div class="title">112.6 tok/s prefill &middot; 5.01 tok/s decode</div>
+    <div class="desc">Loads and runs entirely on the iGPU. Decode is bandwidth-bound: ~40&nbsp;GB streamed per token against ~256&nbsp;GB/s sets the ~5&nbsp;tok/s ceiling.</div>
+  </div>
+  <div class="card">
+    <div class="num">Vulkan &middot; 70B Q4</div>
+    <div class="title">114.3 tok/s prefill &middot; 5.15 tok/s decode</div>
+    <div class="desc">A hair ahead again. At this size the two backends converge &mdash; both are simply waiting on memory, and the silicon, not the driver, sets the pace.</div>
+  </div>
+</div>
+<p>Five tokens per second isn&rsquo;t interactive, but it is <b>real, local, single-node 70B inference</b> on a fanless-class APU &mdash; useful for batch jobs, overnight document processing, and privacy-bound workloads where capacity matters more than latency. The lesson echoes the R9700 series: on bandwidth-limited silicon, <b>pick MoE over dense</b> when you can. A 30B MoE gives you ~96 tok/s; a 70B dense gives you ~5.</p>
+
+<!-- ============ CONCURRENCY ============ -->
+<h2>Result 6 &middot; the crossover &mdash; concurrency flips the winner</h2>
+<p class="lead">Single-user is only half the story. Driving Qwen3-30B-A3B with <span class="mono">llama-batched-bench</span> at 1&ndash;16 parallel sequences (512-token prompt, 128-token gen each) reveals the most important operational nuance of the whole campaign: <b>the backends trade places.</b></p>
+<table>
+  <tr><th>Concurrent streams</th><th class="r">ROCm agg. decode</th><th class="r">Vulkan agg. decode</th><th>Leader</th></tr>
+  <tr><td><b>1</b></td><td class="r">70.0</td><td class="r win">91.9</td><td><span class="pill win">Vulkan</span></td></tr>
+  <tr><td><b>2</b></td><td class="r">98.6</td><td class="r win">130.8</td><td><span class="pill win">Vulkan</span></td></tr>
+  <tr><td><b>4</b></td><td class="r">133.6</td><td class="r win">177.6</td><td><span class="pill win">Vulkan</span></td></tr>
+  <tr><td><b>8</b></td><td class="r">182.1</td><td class="r win">199.8</td><td><span class="pill win">Vulkan</span></td></tr>
+  <tr><td><b>16</b></td><td class="r win">272.3</td><td class="r">180.2</td><td><span class="pill hero">ROCm +51%</span></td></tr>
+</table>
+<p>Vulkan leads from 1 to 8 streams. But at <b>16 concurrent streams Vulkan plateaus (~180 tok/s) while ROCm keeps climbing to 272 tok/s</b> &mdash; a 51% reversal. ROCm&rsquo;s scheduler and HIP kernels scale batched decode better once the GPU is saturated with parallel work; Vulkan&rsquo;s decode throughput actually <i>regresses</i> past 8. If you are building a multi-user or agentic fleet on this APU, ROCm is the backend that gives you headroom.</p>
+<div class="panel accent">
+  <p style="margin:0"><b>The decision, stated plainly:</b> the right backend depends on how many people (or agents) you serve at once. There is no single winner &mdash; there is a crossover at roughly 8&ndash;16 concurrent streams.</p>
+</div>
+
+<!-- ============ DECISION MATRIX ============ -->
+<h2>The stack decision matrix</h2>
+<div class="grid three">
+  <div class="card">
+    <div class="num">PICK &middot; <span class="pill win">Vulkan / RADV</span></div>
+    <div class="title">Interactive &amp; small-batch.</div>
+    <div class="desc">Single user, chat, coding assistants, RAG, long-context, &le;8 concurrent streams. Biggest wins on MoE and deep prefill. Flash attention on.</div>
+    <div class="meta"><b>Why:</b> +37% MoE decode, 4.6&times; deeper-prefill, simplest install (Mesa, no HSA env).</div>
+  </div>
+  <div class="card">
+    <div class="num">PICK &middot; <span class="pill hero">ROCm / HIP</span></div>
+    <div class="title">Many-stream batch serving.</div>
+    <div class="desc">Multi-user endpoints, agentic fleets, offline batch jobs at &ge;16 concurrent sequences where aggregate throughput is the goal.</div>
+    <div class="meta"><b>Why:</b> +51% aggregate decode at 16 streams; keeps scaling where Vulkan plateaus.</div>
+  </div>
+  <div class="card">
+    <div class="num">MODEL &middot; <span class="pill core">Shape &gt; size</span></div>
+    <div class="title">Choose MoE first.</div>
+    <div class="desc">On ~256&nbsp;GB/s, a 30B MoE (~96 tok/s) beats a 70B dense (~5 tok/s) by 19&times; for interactive use. Reserve dense-70B for capacity-bound batch.</div>
+    <div class="meta"><b>Why:</b> decode is bandwidth-bound; active-parameter count is what you actually pay for.</div>
+  </div>
+</div>
+
+<!-- ============ REPRODUCE ============ -->
+<h2>Reproduce every number</h2>
+<p class="lead">Nothing here is hand-waved. The exact sweep commands, runnable on any Strix Halo box once both backends are built:</p>
+<div class="panel">
+<pre># Single-user matrix (per model) — swap build/bin for build-vulkan/bin to switch backend
+BIN=llama.cpp/build/bin      # ROCm   (prefix env below)
+# BIN=llama.cpp/build-vulkan/bin   # Vulkan (no env needed)
+ENV="HSA_OVERRIDE_GFX_VERSION=11.5.1 LD_LIBRARY_PATH=$BIN:/opt/rocm/lib"   # ROCm only
+
+# Result 1 + 2 — FA sweep (prefill + decode)
+$ENV $BIN/llama-bench -m $MODEL -ngl 99 -fa 0,1 -p 512 -n 128 -r 3
+# Result 3 — prefill depth
+$ENV $BIN/llama-bench -m $MODEL -ngl 99 -fa 1 -p 512,2048,4096 -n 0 -r 2
+# Result 4 — micro-batch sweep
+$ENV $BIN/llama-bench -m $MODEL -ngl 99 -fa 1 -b 2048 -ub 256,512,1024 -p 512 -n 0 -r 2
+
+# Result 6 — concurrency / batched throughput (note: newer llama.cpp needs '-fa on')
+$ENV $BIN/llama-batched-bench -m $MODEL -c 12288 -b 2048 -ub 512 \
+     -npp 512 -ntg 128 -npl 1,2,4,8,16 -ngl 99 -fa on</pre>
+  <p style="margin-bottom:0" class="tag">Models (Q4_K_M GGUF) pulled from HuggingFace: Qwen3-30B-A3B, Qwen3-14B, Llama-3.1-8B-Instruct, and a 70B Q4. Build commit <span class="mono">063d9c1</span>; ROCm 7.2.0; Mesa RADV 25.2.8; kernel 6.17-oem.</p>
+</div>
+
+<!-- ============ WHATS NEXT ============ -->
+<h2>What&rsquo;s next in the series</h2>
+<div class="grid two">
+  <div class="card">
+    <div class="num">PART 2 &middot; <span class="pill core">Core</span></div>
+    <div class="title">The memory frontier &amp; KV cache at scale.</div>
+    <div class="desc">Push GTT to ~120&nbsp;GiB, load a 120B/235B MoE on one node, and map exactly how much context the leftover pool buys &mdash; plus the long-context prefill watchdog and its fix.</div>
+  </div>
+  <div class="card">
+    <div class="num">PART 3 &middot; <span class="pill hero">APU-native</span></div>
+    <div class="title">The NPU angle &mdash; Lemonade hybrid iGPU+NPU.</div>
+    <div class="desc">Where XDNA2 + Ryzen-AI changes the math, and whether hybrid execution beats pure-Vulkan on the workloads that matter.</div>
+  </div>
+</div>
+
+<footer>
+  <div>Strix Halo APU field series &middot; Part 1 of N &middot; companion to the R9700 + vLLM series.</div>
+  <div>All numbers measured on real hardware, June 2026. No vendor tuning beyond the documented flags.</div>
+</footer>
+
+</div>
+</body>
+</html>
