@@ -60,13 +60,16 @@
     <div class="desc">gpt-oss-120B (MXFP4 MoE, 59&nbsp;GiB) loads entirely onto the Radeon&nbsp;8060S via the 96&nbsp;GiB unified pool and decodes at ~56&nbsp;tok/s single-user. Vulkan prefills 3.2&times; faster; ROCm wins decode-bound batch from 4 streams up (227&nbsp;tok/s @16, +78%).</div>
   </a>
 </div>
+<div class="group-label">Block II &middot; Past the default pool</div>
+<div class="grid">
+  <a class="card" href="part2.5-strix-halo-qwen3-235b.html">
+    <div class="num">PART 2.5</div>
+    <div class="title">235B on one iGPU &mdash; past the default pool, through the reboot gate.</div>
+    <div class="desc">Qwen3-235B-A22B (UD-Q3_K_XL MoE, 96.6&nbsp;GiB) runs entirely on the Radeon&nbsp;8060S after a grub GTT bump to 120&nbsp;GiB and one reboot. ~18&nbsp;tok/s single-user decode (Vulkan); ROCm wins batch at 16 streams (64&nbsp;tok/s aggregate, +56%) &mdash; plus the <span style="color:var(--accent2)">no-mmap trap</span> that otherwise turns the run into a disk benchmark.</div>
+  </a>
+</div>
 <div class="group-label">Coming next</div>
 <div class="grid">
-  <div class="card" style="opacity:.55; cursor:default;">
-    <div class="num">PART 2.5 &middot; PLANNED</div>
-    <div class="title">Past the default pool &mdash; 235B and the reboot gate.</div>
-    <div class="desc">Pushing GTT beyond 96&nbsp;GiB to seat a Qwen3-235B-A22B-class MoE, mapping the long-context KV ceiling and the grub/reboot tuning it requires.</div>
-  </div>
   <div class="card" style="opacity:.55; cursor:default;">
     <div class="num">PART 3 &middot; PLANNED</div>
     <div class="title">Bringing in the NPU.</div>
